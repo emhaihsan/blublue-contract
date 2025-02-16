@@ -1,66 +1,163 @@
-## Foundry
+# BluBlue Smart Contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+Smart contract implementation for the BluBlue decentralized social media platform.
 
-Foundry consists of:
+> 🏆 This project is part of the **Indonesia Hacker House Hackathon 2025**, organized by [Blockdev.id](https://blockdev.id) and [Manta Network](https://manta.network).
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## Team Members
 
-## Documentation
+- **Pitchdeck & Documentation**:
 
-https://book.getfoundry.sh/
+  - Mr Punk (Duniaweb3)
+  - Bayy
+  - Eliska
 
-## Usage
+- **Flowchart**:
 
-### Build
+  - Andika
 
-```shell
-$ forge build
+- **Smart Contract**:
+
+  - Ihsan
+
+- **Backend**:
+
+  - Saddam Machmud
+
+- **Frontend & Wireframe**:
+  - Bayy
+
+## Smart Contracts Overview
+
+### BluBluePost Contract
+
+- Manages social media posts
+- Handles like/unlike functionality
+- Tracks post engagement metrics
+- Links posts to NFTs
+
+### BluBlueNFT Contract
+
+- ERC-721 implementation for post NFTs
+- Mints NFTs for popular posts
+- Stores metadata and IPFS links
+- Manages NFT transfers and ownership
+
+### BBToken Contract
+
+- ERC-20 implementation for platform tokens
+- Rewards users for engagement
+- Handles token distribution
+- Implements token economics
+
+## Tech Stack
+
+- Solidity ^0.8.20
+- Hardhat
+- OpenZeppelin Contracts
+- Ethers.js
+- Chai (Testing)
+
+## Getting Started
+
+1. Install dependencies:
+
+```bash
+npm install
+# or
+yarn install
 ```
 
-### Test
+2. Set up environment variables:
 
-```shell
-$ forge test
+```bash
+cp .env.example .env
 ```
 
-### Format
+3. Run tests:
 
-```shell
-$ forge fmt
+```bash
+npx hardhat test
 ```
 
-### Gas Snapshots
+4. Deploy contracts:
 
-```shell
-$ forge snapshot
+```bash
+npx hardhat run scripts/deploy.ts --network <network-name>
 ```
 
-### Anvil
+## Contract Architecture
 
-```shell
-$ anvil
+```
+contracts/
+├── BluBluePost.sol      # Post management contract
+├── BluBlueNFT.sol       # NFT implementation
+├── BBToken.sol          # Token implementation
+└── interfaces/          # Contract interfaces
 ```
 
-### Deploy
+## Development Roadmap
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+### Phase 1: Core Contracts
+
+- Contract architecture design
+- Basic post functionality
+- Unit tests implementation
+- Local deployment setup
+
+### Phase 2: Token Integration
+
+- BBToken implementation
+- Token distribution logic
+- Reward mechanisms
+- Economic parameters
+
+### Phase 3: NFT System
+
+- NFT contract implementation
+- Metadata management
+- IPFS integration
+- Minting rules
+
+### Phase 4: Advanced Features
+
+- Governance features
+- Staking mechanisms
+- Advanced reward systems
+- Security enhancements
+
+### Phase 5: Optimization
+
+- Gas optimization
+- Contract upgrades
+- Multi-chain support
+- Performance improvements
+
+## Testing
+
+Run the full test suite:
+
+```bash
+npx hardhat test
 ```
 
-### Cast
+Generate coverage report:
 
-```shell
-$ cast <subcommand>
+```bash
+npx hardhat coverage
 ```
 
-### Help
+## Security
 
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- All contracts are thoroughly tested
+- Follow Solidity best practices
+- Implement access control
+- Use OpenZeppelin secure contracts
+
+## Contributing
+
+Please read our [Contributing Guide](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
