@@ -11,32 +11,32 @@ contract BluBlueNFT is ERC721, Ownable {
 
     // Mapping to store token URIs
     mapping(uint256 => string) private _tokenURIs;
-    
+
     // Mapping to link posts to tokens and vice versa
     mapping(uint256 => uint256) private postToToken;
     mapping(uint256 => uint256) private tokenToPost;
 
     // Event for NFT minting
     event NFTMinted(
-        uint256 indexed tokenId, 
-        uint256 indexed postId, 
+        uint256 indexed tokenId,
+        uint256 indexed postId,
         address indexed author
     );
 
-    constructor(address _postContractAddress) 
-        ERC721("BluBlue Post NFT", "BBPOST") 
-        Ownable(msg.sender) 
-    {
+    constructor(
+        address _postContractAddress
+    ) ERC721("BluBlue NFT", "BBN") Ownable(msg.sender) {
+        require(_postContractAddress != address(0), "Invalid post contract");
         postContract = BluBluePost(_postContractAddress);
     }
 
     function mintPostNFT(uint256 postId) external returns (uint256) {
         // Retrieve the post details
         BluBluePost.Post memory postDetails = postContract.getPost(postId);
-        
+
         // Ensure only the post author can mint
         require(postDetails.author == msg.sender, "Not post author");
-        
+
         // Check if the post has already been minted
         require(postToToken[postId] == 0, "Already minted");
 
@@ -55,18 +55,17 @@ contract BluBlueNFT is ERC721, Ownable {
         return tokenId;
     }
 
-    function tokenURI(uint256 tokenId) 
-        public 
-        view 
-        override 
-        returns (string memory) 
-    {
+    function tokenURI(
+        uint256 tokenId
+    ) public view override returns (string memory) {
         // Ensure token exists
         require(_ownerOf(tokenId) != address(0), "ERC721: invalid token ID");
         return _tokenURIs[tokenId];
     }
 
-    function getPostIdForToken(uint256 tokenId) external view returns (uint256) {
+    function getPostIdForToken(
+        uint256 tokenId
+    ) external view returns (uint256) {
         // Ensure token exists
         require(_ownerOf(tokenId) != address(0), "ERC721: invalid token ID");
         return tokenToPost[tokenId];

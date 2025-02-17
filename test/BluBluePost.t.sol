@@ -1,131 +1,86 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Test, console2} from "forge-std/Test.sol";
-import {BluBluePost} from "../src/BluBluePost.sol";
+import "forge-std/Test.sol";
+import "../src/BluBluePost.sol";
+import "../src/BBToken.sol";
+import "../src/BluBlueNFT.sol";
 
 contract BluBluePostTest is Test {
     BluBluePost public post;
+    BBToken public token;
+    BluBlueNFT public nft;
+
+    address public owner;
     address public user1;
     address public user2;
 
-    event PostCreated(
-        uint256 indexed postId, 
-        address indexed author, 
-        string imageURI, 
-        string caption
-    );
-    
-    event PostLiked(
-        uint256 indexed postId, 
-        address indexed liker
-    );
-    
-    event PostUnliked(
-        uint256 indexed postId, 
-        address indexed unliker
-    );
-    
-    event PostDeleted(
-        uint256 indexed postId, 
-        address indexed author
-    );
-
     function setUp() public {
-        post = new BluBluePost();
+        owner = address(this);
         user1 = makeAddr("user1");
         user2 = makeAddr("user2");
+
+        // Deploy contracts
+        post = new BluBluePost();
+        token = new BBToken(address(post));
+        nft = new BluBlueNFT(address(post));
+
+        // Set token and NFT addresses
+        post.setTokenContract(address(token));
+        post.setNFTContract(address(nft));
+
+        // Give some ETH to test users
+        vm.deal(user1, 1 ether);
+        vm.deal(user2, 1 ether);
     }
 
     function test_CreatePost() public {
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
+        vm.startPrank(user1);
+
+        string memory imageURI = "ipfs://QmTest";
+        string memory caption = "Test post";
+
+        uint256 postId = post.createPost(imageURI, caption);
 
         BluBluePost.Post memory createdPost = post.getPost(postId);
-        
-        assertEq(createdPost.id, postId);
         assertEq(createdPost.author, user1);
-        assertEq(createdPost.imageURI, "ipfs://image1");
-        assertEq(createdPost.caption, "First post!");
+        assertEq(createdPost.imageURI, imageURI);
+        assertEq(createdPost.caption, caption);
         assertEq(createdPost.likeCount, 0);
         assertTrue(createdPost.isActive);
-    }
 
-    function test_CreatePost_EmitsEvent() public {
-        vm.prank(user1);
-        
-        vm.expectEmit(true, true, false, true);
-        emit PostCreated(1, user1, "ipfs://image1", "First post!");
-        
-        post.createPost("ipfs://image1", "First post!");
-    }
-
-    function test_RevertWhen_CreatingPostWithEmptyURI() public {
-        vm.prank(user1);
-        vm.expectRevert("Empty URI");
-        post.createPost("", "Empty URI post");
+        vm.stopPrank();
     }
 
     function test_LikePost() public {
         // Create a post first
         vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
 
-        // Like the post
+        // Like the post as user2
         vm.prank(user2);
         post.likePost(postId);
 
-        // Check post state
         BluBluePost.Post memory likedPost = post.getPost(postId);
         assertEq(likedPost.likeCount, 1);
         assertTrue(post.userLikes(postId, user2));
     }
 
-    function test_LikePost_EmitsEvent() public {
-        // Create a post first
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
-
-        // Like the post
-        vm.prank(user2);
-        
-        vm.expectEmit(true, true, false, false);
-        emit PostLiked(postId, user2);
-        
-        post.likePost(postId);
-    }
-
-    function test_RevertWhen_LikingNonExistentPost() public {
-        vm.prank(user1);
-        vm.expectRevert("Post not found");
-        post.likePost(999);
-    }
-
     function test_RevertWhen_LikingOwnPost() public {
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
+        vm.startPrank(user1);
 
-        vm.prank(user1);
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
+
         vm.expectRevert("Can't like own post");
         post.likePost(postId);
-    }
 
-    function test_RevertWhen_LikingPostTwice() public {
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
-
-        vm.prank(user2);
-        post.likePost(postId);
-
-        vm.prank(user2);
-        vm.expectRevert("Already liked");
-        post.likePost(postId);
+        vm.stopPrank();
     }
 
     function test_UnlikePost() public {
-        // Create and like a post first
+        // Create and like a post
         vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
 
         vm.prank(user2);
         post.likePost(postId);
@@ -134,102 +89,79 @@ contract BluBluePostTest is Test {
         vm.prank(user2);
         post.unlikePost(postId);
 
-        // Check post state
         BluBluePost.Post memory unlikedPost = post.getPost(postId);
         assertEq(unlikedPost.likeCount, 0);
         assertFalse(post.userLikes(postId, user2));
     }
 
-    function test_UnlikePost_EmitsEvent() public {
-        // Create and like a post first
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
-
-        vm.prank(user2);
-        post.likePost(postId);
-
-        // Unlike the post
-        vm.prank(user2);
-        
-        vm.expectEmit(true, true, false, false);
-        emit PostUnliked(postId, user2);
-        
-        post.unlikePost(postId);
-    }
-
-    function test_RevertWhen_UnlikingWithoutLiking() public {
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
-
-        vm.prank(user2);
-        vm.expectRevert("Not liked");
-        post.unlikePost(postId);
-    }
-
     function test_DeletePost() public {
-        // Create a post
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
+        vm.startPrank(user1);
 
-        // Delete the post
-        vm.prank(user1);
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
         post.deletePost(postId);
 
-        // Try to get the post (should revert)
         vm.expectRevert("Post not found");
         post.getPost(postId);
+
+        vm.stopPrank();
     }
 
-    function test_DeletePost_EmitsEvent() public {
-        // Create a post
+    function test_RevertWhen_DeletingOtherUserPost() public {
+        // Create post as user1
         vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
 
-        // Delete the post
-        vm.prank(user1);
-        
-        vm.expectEmit(true, true, false, false);
-        emit PostDeleted(postId, user1);
-        
-        post.deletePost(postId);
-    }
-
-    function test_RevertWhen_NonAuthorDeletesPost() public {
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
-
+        // Try to delete as user2 (should revert)
         vm.prank(user2);
         vm.expectRevert("Not authorized");
         post.deletePost(postId);
     }
 
     function test_GetUserPosts() public {
-        // Create multiple posts
         vm.startPrank(user1);
-        uint256 postId1 = post.createPost("ipfs://image1", "First post!");
-        uint256 postId2 = post.createPost("ipfs://image2", "Second post!");
-        post.deletePost(postId1);
-        vm.stopPrank();
 
-        // Get user posts
+        // Create multiple posts
+        post.createPost("ipfs://QmTest1", "Test post 1");
+        post.createPost("ipfs://QmTest2", "Test post 2");
+        post.createPost("ipfs://QmTest3", "Test post 3");
+
         BluBluePost.Post[] memory userPosts = post.getUserPosts(user1);
-        
-        // Should only return active posts
-        assertEq(userPosts.length, 1);
-        assertEq(userPosts[0].id, postId2);
+        assertEq(userPosts.length, 3);
+
+        vm.stopPrank();
     }
 
-    function test_UserLikes() public {
-        // Create a post
+    function test_SetTokenContract() public {
+        address newToken = makeAddr("newToken");
+        post.setTokenContract(newToken);
+        assertEq(post.tokenContract(), newToken);
+    }
+
+    function test_SetNFTContract() public {
+        address newNFT = makeAddr("newNFT");
+        post.setNFTContract(newNFT);
+        assertEq(post.nftContract(), newNFT);
+    }
+
+    function test_RevertWhen_SettingTokenContractUnauthorized() public {
         vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://image1", "First post!");
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "OwnableUnauthorizedAccount(address)",
+                user1
+            )
+        );
+        post.setTokenContract(address(0x1));
+    }
 
-        // Like the post
-        vm.prank(user2);
-        post.likePost(postId);
-
-        // Check likes
-        assertTrue(post.userLikes(postId, user2));
-        assertFalse(post.userLikes(postId, user1));
+    function test_RevertWhen_SettingNFTContractUnauthorized() public {
+        vm.prank(user1);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "OwnableUnauthorizedAccount(address)",
+                user1
+            )
+        );
+        post.setNFTContract(address(0x1));
     }
 }

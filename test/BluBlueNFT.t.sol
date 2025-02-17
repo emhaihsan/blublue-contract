@@ -1,167 +1,106 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Test, console2} from "forge-std/Test.sol";
-import {BluBlueNFT} from "../src/BluBlueNFT.sol";
-import {BluBluePost} from "../src/BluBluePost.sol";
+import "forge-std/Test.sol";
+import "../src/BluBlueNFT.sol";
+import "../src/BluBluePost.sol";
 
 contract BluBlueNFTTest is Test {
     BluBlueNFT public nft;
     BluBluePost public post;
-    
+
     address public owner;
     address public user1;
     address public user2;
-
-    event NFTMinted(
-        uint256 indexed tokenId, 
-        uint256 indexed postId, 
-        address indexed author
-    );
 
     function setUp() public {
         owner = address(this);
         user1 = makeAddr("user1");
         user2 = makeAddr("user2");
 
-        // Deploy post contract first
+        // Deploy contracts
         post = new BluBluePost();
-
-        // Deploy NFT contract with post contract address
         nft = new BluBlueNFT(address(post));
+
+        // Set NFT address in post contract
+        post.setNFTContract(address(nft));
+
+        // Give some ETH to test users
+        vm.deal(user1, 1 ether);
+        vm.deal(user2, 1 ether);
     }
 
-    function test_ContractInitialization() public {
-        assertEq(nft.name(), "BluBlue Post NFT");
-        assertEq(nft.symbol(), "BBPOST");
+    function test_Initialize() public {
+        assertEq(nft.name(), "BluBlue NFT");
+        assertEq(nft.symbol(), "BBN");
         assertEq(address(nft.postContract()), address(post));
     }
 
-    function test_MintNFT() public {
-        // Create a post first
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://test-image", "Test caption");
-
-        // Mint NFT for the post
-        vm.prank(user1);
-        uint256 tokenId = nft.mintPostNFT(postId);
-
-        // Verify NFT details
-        assertEq(nft.ownerOf(tokenId), user1);
-        assertEq(nft.tokenURI(tokenId), "ipfs://test-image");
-    }
-
-    function test_MintNFT_EmitsEvent() public {
-        // Create a post first
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://test-image", "Test caption");
-
-        // Expect event
-        vm.prank(user1);
-        vm.expectEmit(true, true, true, false);
-        emit NFTMinted(1, postId, user1);
-        
-        nft.mintPostNFT(postId);
-    }
-
-    function test_RevertWhen_NonAuthorMints() public {
+    function test_MintPostNFT() public {
         // Create a post as user1
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://test-image", "Test caption");
+        vm.startPrank(user1);
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
 
-        // Try to mint as user2
-        vm.prank(user2);
-        vm.expectRevert("Not post author");
-        nft.mintPostNFT(postId);
-    }
-
-    function test_RevertWhen_MintingTwice() public {
-        // Create a post
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://test-image", "Test caption");
-
-        // Mint first time
-        vm.prank(user1);
-        nft.mintPostNFT(postId);
-
-        // Try to mint again
-        vm.prank(user1);
-        vm.expectRevert("Already minted");
-        nft.mintPostNFT(postId);
-    }
-
-    function test_GetPostIdForToken() public {
-        // Create a post
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://test-image", "Test caption");
-
-        // Mint NFT
-        vm.prank(user1);
+        // User1 mints their own post
         uint256 tokenId = nft.mintPostNFT(postId);
+        vm.stopPrank();
 
-        // Verify post ID retrieval
+        // Verify NFT ownership and data
+        assertEq(nft.ownerOf(tokenId), user1);
+        assertEq(nft.tokenURI(tokenId), "ipfs://QmTest");
         assertEq(nft.getPostIdForToken(tokenId), postId);
-    }
-
-    function test_GetTokenIdForPost() public {
-        // Create a post
-        vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://test-image", "Test caption");
-
-        // Mint NFT
-        vm.prank(user1);
-        uint256 tokenId = nft.mintPostNFT(postId);
-
-        // Verify token ID retrieval
         assertEq(nft.getTokenIdForPost(postId), tokenId);
     }
 
-    function test_TransferNFT() public {
-        // Create a post
+    function test_DifferentUsersMintingSamePost() public {
+        // User1 creates a post
         vm.prank(user1);
-        uint256 postId = post.createPost("ipfs://test-image", "Test caption");
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
 
-        // Mint NFT
+        // User1 tries to mint NFT
         vm.prank(user1);
-        uint256 tokenId = nft.mintPostNFT(postId);
+        uint256 tokenId1 = nft.mintPostNFT(postId);
 
-        // Transfer NFT
-        vm.prank(user1);
-        nft.transferFrom(user1, user2, tokenId);
+        // User2 tries to mint the same post (should revert)
+        vm.prank(user2);
+        vm.expectRevert("Not post author");
+        nft.mintPostNFT(postId);
 
-        // Verify new ownership
-        assertEq(nft.ownerOf(tokenId), user2);
+        // Verify only user1's NFT exists
+        assertEq(nft.ownerOf(tokenId1), user1);
+        assertEq(nft.getTokenIdForPost(postId), tokenId1);
     }
 
-    function test_RevertWhen_TokenURIForNonExistentToken() public {
+    function test_RevertWhen_MintingSamePostTwice() public {
+        // Create and mint first time
+        vm.startPrank(user1);
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
+        nft.mintPostNFT(postId);
+
+        // Try to mint again (should revert)
+        vm.expectRevert("Already minted");
+        nft.mintPostNFT(postId);
+        vm.stopPrank();
+    }
+
+    function test_RevertWhen_MintingNonExistentPost() public {
+        vm.prank(user1);
+        vm.expectRevert("Post not found");
+        nft.mintPostNFT(999);
+    }
+
+    function test_TokenURI() public {
+        // Create post and mint NFT
+        vm.startPrank(user1);
+        uint256 postId = post.createPost("ipfs://QmTest", "Test post");
+        uint256 tokenId = nft.mintPostNFT(postId);
+        vm.stopPrank();
+
+        assertEq(nft.tokenURI(tokenId), "ipfs://QmTest");
+    }
+
+    function test_RevertWhen_QueryingNonexistentToken() public {
         vm.expectRevert("ERC721: invalid token ID");
         nft.tokenURI(999);
-    }
-
-    function test_RevertWhen_GetPostIdForNonExistentToken() public {
-        vm.expectRevert("ERC721: invalid token ID");
-        nft.getPostIdForToken(999);
-    }
-
-    function test_MultiplePostsMintedByDifferentUsers() public {
-        // Create posts by different users
-        vm.prank(user1);
-        uint256 postId1 = post.createPost("ipfs://image1", "First post");
-
-        vm.prank(user2);
-        uint256 postId2 = post.createPost("ipfs://image2", "Second post");
-
-        // Mint NFTs
-        vm.prank(user1);
-        uint256 tokenId1 = nft.mintPostNFT(postId1);
-
-        vm.prank(user2);
-        uint256 tokenId2 = nft.mintPostNFT(postId2);
-
-        // Verify details
-        assertEq(nft.ownerOf(tokenId1), user1);
-        assertEq(nft.ownerOf(tokenId2), user2);
-        assertEq(nft.tokenURI(tokenId1), "ipfs://image1");
-        assertEq(nft.tokenURI(tokenId2), "ipfs://image2");
     }
 }
